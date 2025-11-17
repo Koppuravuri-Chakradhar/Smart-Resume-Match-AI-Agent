@@ -1,6 +1,5 @@
 """
 Keyword extraction helper built on NLTK for lightweight NLP processing.
-
 Used by multiple agents to normalize skills and job requirements.
 """
 
@@ -14,6 +13,14 @@ from typing import Iterable, List, Tuple
 import nltk
 from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize
+
+# -----------------------------------------
+# 🔥 FIX: Auto-download resources for Streamlit Cloud
+# -----------------------------------------
+nltk.download("punkt", quiet=True)
+nltk.download("punkt_tab", quiet=True)     # Streamlit Cloud needs this
+nltk.download("stopwords", quiet=True)
+# -----------------------------------------
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +48,7 @@ class KeywordExtractor:
             return []
 
         normalized = re.sub(r"[^A-Za-z0-9\s]+", " ", text.lower())
+
         tokens = [
             token
             for token in word_tokenize(normalized)
@@ -52,12 +60,11 @@ class KeywordExtractor:
         return frequency.most_common(max_keywords)
 
     def _ensure_nltk_resources(self) -> None:
-        """Download required NLTK corpora if unavailable."""
-        resources: Iterable[str] = ("punkt", "stopwords")
+        """Ensure required NLTK corpora exist, otherwise download."""
+        resources: Iterable[str] = ("punkt", "stopwords", "punkt_tab")
         for resource in resources:
             try:
                 nltk.data.find(f"tokenizers/{resource}")
             except LookupError:
                 logger.info("Downloading NLTK resource: %s", resource)
-                nltk.download(resource)
-
+                nltk.download(resource, quiet=True)
