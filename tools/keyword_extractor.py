@@ -10,17 +10,24 @@ import re
 from collections import Counter
 from typing import Iterable, List, Tuple
 
+# -----------------------------------------
+# 🔥 FINAL STREAMLIT FIX: Custom NLTK directory
+# -----------------------------------------
 import nltk
+import os
+
+NLTK_DIR = "/tmp/nltk_data"
+os.makedirs(NLTK_DIR, exist_ok=True)
+nltk.data.path.append(NLTK_DIR)
+
+# Download resources into /tmp (read/write allowed on Streamlit)
+nltk.download("punkt", download_dir=NLTK_DIR, quiet=True)
+nltk.download("punkt_tab", download_dir=NLTK_DIR, quiet=True)
+nltk.download("stopwords", download_dir=NLTK_DIR, quiet=True)
+# -----------------------------------------
+
 from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize
-
-# -----------------------------------------
-# 🔥 FIX: Auto-download resources for Streamlit Cloud
-# -----------------------------------------
-nltk.download("punkt", quiet=True)
-nltk.download("punkt_tab", quiet=True)     # Streamlit Cloud needs this
-nltk.download("stopwords", quiet=True)
-# -----------------------------------------
 
 logger = logging.getLogger(__name__)
 
@@ -34,16 +41,7 @@ class KeywordExtractor:
         self.stop_words = set(stopwords.words(language))
 
     def extract(self, text: str, max_keywords: int = 25) -> List[Tuple[str, int]]:
-        """
-        Extract ranked keywords from text.
-
-        Args:
-            text: Free-form text input.
-            max_keywords: Maximum keywords to return.
-
-        Returns:
-            List of (keyword, frequency) tuples sorted by frequency.
-        """
+        """Extract ranked keywords."""
         if not text:
             return []
 
@@ -56,15 +54,13 @@ class KeywordExtractor:
         ]
 
         frequency = Counter(tokens)
-        logger.debug("Extracted %s unique keywords", len(frequency))
         return frequency.most_common(max_keywords)
 
     def _ensure_nltk_resources(self) -> None:
-        """Ensure required NLTK corpora exist, otherwise download."""
+        """Ensure NLTK corpora exist."""
         resources: Iterable[str] = ("punkt", "stopwords", "punkt_tab")
         for resource in resources:
             try:
-                nltk.data.find(f"tokenizers/{resource}")
+                nltk.data.find(f"*/*/{resource}")
             except LookupError:
-                logger.info("Downloading NLTK resource: %s", resource)
-                nltk.download(resource, quiet=True)
+                nltk.download(resource, download_dir=NLTK_DIR, quiet=True)
