@@ -1,6 +1,6 @@
 """
 Streamlit UI for Smart Resume → Job Match AI Agent.
-Supports PDF & DOCX resumes.
+Mobile-friendly version (Android/iPhone support)
 """
 
 from __future__ import annotations
@@ -8,101 +8,140 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 from typing import List
+import streamlit as st
 
-# Add parent directory to import app module
+# Add parent directory so we can import app module
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-import streamlit as st
 from app import process_multiple_resumes
 
-# Page setup
-st.set_page_config(page_title="Smart Resume Match", layout="wide")
-st.title("Smart Resume → Job Match AI Agent")
-st.write("Upload PDF or DOCX resumes and paste a job description to generate match scores, ATS breakdown, and HR-style evaluation reports.")
+# -------------------------------------------------
+# 🔥 MOBILE FIX (CRITICAL) — Prevent 403 Forbidden Error
+# -------------------------------------------------
+st.markdown(
+    """
+    <meta name="referrer" content="no-referrer">
+    <meta http-equiv="Content-Security-Policy" content="upgrade-insecure-requests">
+    """,
+    unsafe_allow_html=True
+)
 
-# Upload Section
+# -------------------------------------------------
+# MOBILE FIX 1 — Improved responsiveness + viewport
+# -------------------------------------------------
+st.set_page_config(page_title="Smart Resume Match", layout="wide")
+
+# Style fixes
+st.markdown("""
+<style>
+html, body {
+    max-width: 100%;
+    overflow-x: hidden;
+}
+
+.block-container {
+    padding-left: 1rem;
+    padding-right: 1rem;
+}
+
+@media (max-width: 600px) {
+    .block-container {
+        padding: 0.5rem;
+    }
+    textarea, input, .stTextArea {
+        font-size: 14px !important;
+    }
+}
+</style>
+
+<meta name="viewport" content="width=device-width, initial-scale=1">
+""", unsafe_allow_html=True)
+
+# -------------------------------------------------
+# UI SECTION
+# -------------------------------------------------
+st.title("Smart Resume → Job Match AI Agent")
+st.write("Upload PDF or DOCX resumes and paste a job description to generate match scores and reports.")
+
 uploaded_resumes = st.file_uploader(
     "Upload Resumes (PDF or DOCX only)",
     type=["pdf", "docx"],
     accept_multiple_files=True
 )
 
-job_description = st.text_area("Paste Job Description", height=200)
+job_description = st.text_area("Paste Job Description", height=180)
 
-# Main Action Button
+# -------------------------------------------------
+# MOBILE FIX 2 — Limit file size for mobile browsers
+# -------------------------------------------------
+if uploaded_resumes:
+    for file in uploaded_resumes:
+        if file.size > 3 * 1024 * 1024:  # 3MB limit
+            st.error(f"{file.name} is too large (>3MB). Please upload from laptop/desktop.")
+            st.stop()
+
+# -------------------------------------------------
+# ANALYZE BUTTON
+# -------------------------------------------------
 if st.button("Analyze"):
 
     if not uploaded_resumes:
-        st.error("❗ Please upload at least one resume.")
-    elif not job_description.strip():
-        st.error("❗ Please paste a job description.")
-    else:
-        st.success("Processing resumes... Please wait ⏳")
+        st.error("Please upload at least one resume.")
+        st.stop()
 
-        # Convert uploaded files to bytes
-        resume_payloads: List[bytes] = []
-        for file in uploaded_resumes:
-            try:
-                file_bytes = file.read()
-                file.seek(0)
-                resume_payloads.append(file_bytes)
-            except Exception as e:
-                st.error(f"Error reading file {file.name}: {e}")
-                continue
+    if not job_description.strip():
+        st.error("Please paste a job description.")
+        st.stop()
 
-        # Run pipeline
+    st.success("Processing resumes... Please wait.")
+
+    # Convert UploadedFile → bytes
+    resume_payloads: List[bytes] = []
+    for file in uploaded_resumes:
         try:
-            sessions = process_multiple_resumes(resume_payloads, job_description)
+            file_bytes = file.read()
+            file.seek(0)
+            resume_payloads.append(file_bytes)
         except Exception as e:
-            st.error(f"🔥 Pipeline Error: {e}")
-            st.stop()
+            st.error(f"Error reading file {file.name}: {e}")
+            continue
 
-        # DISPLAY RESULTS
-        for session, file in zip(sessions, uploaded_resumes):
+    # Run pipeline
+    try:
+        sessions = process_multiple_resumes(resume_payloads, job_description)
+    except Exception as e:
+        st.error(f"🔥 Pipeline Error: {e}")
+        st.stop()
 
-            st.markdown(f"## 📝 Results for: **{file.name}**")
+    # -------------------------------------------------
+    # DISPLAY RESULTS
+    # -------------------------------------------------
+    for session, file in zip(sessions, uploaded_resumes):
 
-            score = session.get("score_breakdown")
-            report = session.get("report")
+        st.subheader(f"Results for: {file.name}")
 
-            # SCORE CARD
-            st.markdown("### 🎯 Total Score")
-            if score:
-                st.metric("", f"{score.total:.2f}")
-            else:
-                st.metric("", "0.00")
+        score = session.get("score_breakdown")
+        report = session.get("report")
 
-            # FIT RATING
-            if score:
-                st.markdown(f"""
-                ### 🏅 Fit Rating  
-                **{score.fit_rating}**
-                """)
+        # Total Score
+        if score:
+            st.metric("Total Score", f"{score.total:.2f}")
+        else:
+            st.metric("Total Score", "0.00")
 
-            # ATS BREAKDOWN
-            if score:
-                st.markdown("""
-                ### 📊 ATS Score Breakdown
-                """)
-                col1, col2, col3, col4 = st.columns(4)
-                col1.metric("Skill Match", f"{score.skill_match}%")
-                col2.metric("Keyword Match", f"{score.keyword_match}%")
-                col3.metric("Experience Match", f"{score.experience_match}%")
-                col4.metric("Structure Score", f"{score.structure_score}%")
+        # Summary
+        st.write("### Summary")
+        if report:
+            st.markdown(report.get("summary", "No summary available."), unsafe_allow_html=True)
+        else:
+            st.write("No report generated.")
 
-            # SUMMARY
-            st.markdown("### 🧾 Summary")
-            if report:
-                st.markdown(report.get("summary", "No summary available."), unsafe_allow_html=True)
-            else:
-                st.write("No summary available.")
-
-            # MISSING SKILLS
-            st.markdown("### ❌ Missing Skills")
-            if report:
-                st.markdown(report.get("skill_gap", "None"))
-            else:
-                st.write("N/A")
+        # Missing Skills
+        st.write("### Missing Skills")
+        if report:
+            st.write(report.get("skill_gap", "None"))
+        else:
+            st.write("N/A")
 
 else:
-    st.info("📂 Upload resume(s) and a job description, then click **Analyze**.")
+    st.info("Upload resume(s) and a job description, then click Analyze.")
