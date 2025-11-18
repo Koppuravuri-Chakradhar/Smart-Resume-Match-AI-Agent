@@ -93,7 +93,8 @@ if st.button("Analyze"):
         st.error("Please paste a job description.")
         st.stop()
 
-    st.success("Processing resumes... Please wait.")
+    st.success("Processing resumes... Please wait ⏳")
+
 
     # Convert UploadedFile → bytes
     resume_payloads: List[bytes] = []

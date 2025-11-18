@@ -65,33 +65,47 @@ class ReportAgent:
         try:
             model = genai.GenerativeModel("models/gemini-2.5-flash")
 
-            prompt = (
-                "You are an expert HR recruiter. Generate a clean, well-formatted Markdown report.\n"
-                "Each section MUST appear on its own with proper line breaks.\n\n"
+           prompt = (
+    "You are an expert HR recruiter. Generate a structured ATS evaluation "
+    "using EXACTLY the following sections with these emojis. Do NOT remove emojis. "
+    "Do NOT add new headings. Keep formatting consistent every time.\n\n"
 
-                "### Strengths\n"
-                "List 2–4 strengths based on resume skills and JD match.\n\n"
+    "📄 **Results Overview**\n"
+    "- Provide a one-line summary of resume–job match quality.\n\n"
 
-                "### Weaknesses\n"
-                "List 2–4 weaknesses based on missing skills.\n\n"
+    "🎯 **Total Score**\n"
+    "- Provide ONLY the score explanation in 1–2 lines.\n\n"
 
-                "### Fit Rating\n"
-                f"{breakdown.fit_rating} (summarize why)\n\n"
+    "🏅 **Fit Rating**\n"
+    "- State the fit rating (Poor/Moderate/Strong) with 1–2 lines of reasoning.\n\n"
 
-                "### ATS Score Breakdown\n"
-                f"- Skill Match: {breakdown.skill_match}%\n"
-                f"- Keyword Match: {breakdown.keyword_match}%\n"
-                f"- Experience Match: {breakdown.experience_match}%\n"
-                f"- Structure Score: {breakdown.structure_score}%\n\n"
+    "📊 **ATS Score Breakdown**\n"
+    f"- Skill Match: {breakdown.skill_match}%\n"
+    f"- Keyword Match: {breakdown.keyword_match}%\n"
+    f"- Experience Match: {breakdown.experience_match}%\n"
+    f"- Structure Score: {breakdown.structure_score}%\n\n"
 
-                "### Improvement Suggestions\n"
-                "List exactly 3 numbered, actionable steps.\n\n"
+    "🧾 **Summary**\n"
+    "- Provide a 2–3 line overall interpretation of the candidate profile.\n\n"
 
-                f"Resume Skills: {resume.get('skills', [])}\n"
-                f"Job Skills: {jd.get('skills', [])}\n\n"
+    "✨ **Strengths**\n"
+    "List exactly 3 bullet points.\n\n"
 
-                "Return ONLY clean Markdown. No JSON. No inline labels."
-            )
+    "⚠️ **Weaknesses**\n"
+    "List exactly 3 bullet points.\n\n"
+
+    "🎓 **Improvement Suggestions**\n"
+    "Provide exactly 3 numbered, actionable suggestions.\n\n"
+
+    "❌ **Missing Skills**\n"
+    "- Provide comma-separated missing skills only.\n\n"
+
+    f"Resume Skills: {resume.get('skills', [])}\n"
+    f"Job Description Skills: {jd.get('skills', [])}\n\n"
+
+    "Return ONLY the formatted markdown with emojis — no extra commentary."
+)
+
 
             response = model.generate_content(prompt)
             text = _extract_text(response)
