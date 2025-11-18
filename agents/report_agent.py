@@ -1,16 +1,15 @@
 from __future__ import annotations
 
 import logging
-import json
+import os
 from typing import Dict
 from dotenv import load_dotenv
-import os
 import google.generativeai as genai
 
 from memory.session_state import SessionState
 from tools.scoring_engine import MatchBreakdown
 
-# Load API key
+# Load key
 load_dotenv()
 API_KEY = os.getenv("GOOGLE_API_KEY")
 if API_KEY:
@@ -18,87 +17,91 @@ if API_KEY:
 
 logger = logging.getLogger(__name__)
 
+
 def _extract_text(response) -> str:
-    """Safely return response text."""
     try:
         return response.text or ""
-    except Exception:
+    except:
         return ""
 
-class ReportAgent:
-    """Agent that generates a clean, emoji-rich HR report without repeating ATS breakdown."""
 
-    def __init__(self, session: SessionState, model: str = "models/gemini-2.5-flash") -> None:
+class ReportAgent:
+    """Generates clean HR-style report WITHOUT ATS section (UI handles that)."""
+
+    def __init__(self, session: SessionState, model="models/gemini-2.5-flash"):
         self.session = session
-        self.model_name = model
-        self.gemini_enabled = API_KEY is not None
+        self.model = model
+        self.enabled = API_KEY is not None
 
     def run(self) -> Dict[str, str]:
-        resume_features = self.session.get("resume_features", {})
-        jd_features = self.session.get("jd_features", {})
+        resume = self.session.get("resume_features", {})
+        jd = self.session.get("jd_features", {})
         breakdown: MatchBreakdown = self.session.get("score_breakdown")
 
-        narrative = self._generate_narrative(resume_features, jd_features, breakdown)
-
-        report = {
+        narrative = self._generate(resume, jd, breakdown)
+        return {
             "summary": narrative,
-            "skill_gap": self._derive_skill_gap(resume_features, jd_features),
+            "skill_gap": self._skill_gap(resume, jd)
         }
-        self.session.set("report", report)
-        return report
 
-    def _generate_narrative(self, resume: Dict, jd: Dict, breakdown: MatchBreakdown | None) -> str:
-        fallback = (
-            f"Resume matches job at {breakdown.total if breakdown else 0:.2f}%. "
-            "Review missing skills to improve alignment."
-        )
+    def _generate(self, resume, jd, breakdown):
+        fallback = "Unable to generate report."
 
-        if not self.gemini_enabled:
+        if not self.enabled:
             return fallback
 
         try:
-            model = genai.GenerativeModel(self.model_name)
+            model = genai.GenerativeModel(self.model)
 
             prompt = f"""
-You are an expert HR recruiter. Generate a clean, professional evaluation in Markdown with emojis.
-
-DO NOT include a Missing Skills section.
-DO NOT repeat ATS Score Breakdown because the UI already shows it.
+You must generate ONLY the sections below — NO ATS numbers.
+ATS breakdown is handled by frontend UI.
 
 FORMAT EXACTLY:
 
-📄 **Summary**
-<3–5 sentence summary>
+🧾 Summary
+<4–6 sentence professional summary>
 
-🎯 **Strengths**
-- point
-- point
+🎯 Strengths
+• point
+• point
+• point
 
-⚠️ **Weaknesses**
-- point
-- point
+⚠️ Weaknesses
+• point
+• point
+• point
 
-🥇 **Fit Rating**
-{breakdown.fit_rating if breakdown else "N/A"}
+🥇 Fit Rating: {breakdown.fit_rating}
+<short paragraph>
 
-🛠️ **Improvement Suggestions**
+🛠️ Improvement Suggestions
 1. suggestion
 2. suggestion
 3. suggestion
 
-Inputs:
+❌ Missing Skills
+(This section will be filled by backend — DO NOT add items.)
+
+STRICT RULES:
+- DO NOT include ATS scores here.
+- DO NOT repeat Missing Skills.
+- DO NOT add emojis at the end of lines.
+- DO NOT use '-' for bullets, only '•'.
+- Keep spacing EXACTLY like shown.
+
 Resume Skills: {resume.get('skills', [])}
 Job Skills: {jd.get('skills', [])}
 """
 
-            response = model.generate_content(prompt)
-            return _extract_text(response).strip() or fallback
+            resp = model.generate_content(prompt)
+            return _extract_text(resp).strip() or fallback
 
-        except Exception as exc:
-            logger.error("Gemini error: %s", exc)
+        except Exception as e:
+            logger.error("Gemini report generation failed: %s", e)
             return fallback
 
-    def _derive_skill_gap(self, resume: Dict, jd: Dict) -> str:
-        resume_skills = {s.lower() for s in resume.get("skills", [])}
-        missing = [s for s in jd.get("skills", []) if s.lower() not in resume_skills]
+    def _skill_gap(self, resume, jd):
+        rs = {s.lower() for s in resume.get("skills", [])}
+        missing = [s for s in jd.get("skills", []) if s.lower() not in rs]
         return ", ".join(sorted(set(missing))) or "No significant gaps identified."
