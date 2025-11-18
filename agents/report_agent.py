@@ -62,7 +62,8 @@ class ReportAgent:
             prompt = f"""
 You are an expert HR recruiter. Generate a clean, professional evaluation in Markdown with emojis.
 
-DO NOT repeat ATS Score Breakdown because UI already shows it.
+DO NOT include a Missing Skills section.
+DO NOT repeat ATS Score Breakdown because the UI already shows it.
 
 FORMAT EXACTLY:
 
@@ -84,9 +85,6 @@ FORMAT EXACTLY:
 1. suggestion
 2. suggestion
 3. suggestion
-
-❌ **Missing Skills**
-(Just list missing skills)
 
 Inputs:
 Resume Skills: {resume.get('skills', [])}
