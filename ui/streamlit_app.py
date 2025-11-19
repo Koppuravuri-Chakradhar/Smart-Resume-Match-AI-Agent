@@ -41,50 +41,51 @@ if st.button("Analyze"):
 
     sessions = process_multiple_resumes(resume_bytes, jd_text)
 
-    # Output
+    # OUTPUT PER RESUME
     for session, file in zip(sessions, uploaded_resumes):
         st.markdown(f"## 📄 Results for: **{file.name}**")
 
-        score = session.get("score_breakdown", {})
-        rep = session.get("report", {})
+        score = session.get("score_breakdown")
+        report = session.get("report", {})
 
+        # -----------------------------
         # TOTAL SCORE
-        st.metric("🎯 Total Score", f"{score.get('total', 0)}")
+        # -----------------------------
+        if score:
+            st.metric("🎯 Total Score", f"{score.total:.2f}")
+        else:
+            st.metric("🎯 Total Score", "0.00")
 
+        # -----------------------------
         # FIT RATING
-        st.metric("🏅 Fit Rating", score.get("fit_rating", "N/A"))
+        # -----------------------------
+        if score:
+            st.metric("🏅 Fit Rating", score.fit_rating)
+        else:
+            st.metric("🏅 Fit Rating", "N/A")
 
-        # ATS Breakdown
-        st.markdown("### 📊 ATS Score Breakdown")
-        c1, c2, c3, c4 = st.columns(4)
-        c1.metric("Skill Match", f"{score.get('skill_match', 0)}%")
-        c2.metric("Keyword Match", f"{score.get('keyword_match', 0)}%")
-        c3.metric("Experience", f"{score.get('experience_match', 0)}%")
-        c4.metric("Structure Score", f"{score.get('structure_score', 0)}%")
+        # -----------------------------
+        # ATS BREAKDOWN (4 columns)
+        # -----------------------------
+        if score:
+            st.markdown("### 📊 ATS Score Breakdown")
+            c1, c2, c3, c4 = st.columns(4)
+            c1.metric("Skill Match", f"{score.skill_match:.2f}%")
+            c2.metric("Keyword Match", f"{score.keyword_match:.2f}%")
+            c3.metric("Experience Match", f"{score.experience_match:.2f}%")
+            c4.metric("Structure Score", f"{score.structure_score:.2f}%")
 
-        # Summary
+        # -----------------------------
+        # FULL SUMMARY (generated markdown)
+        # -----------------------------
         st.markdown("### 🧾 Summary")
-        st.write(rep.get("summary", ""))
+        st.markdown(report.get("summary", "No summary available."), unsafe_allow_html=True)
 
-        # Strengths
-        st.markdown("### 🎯 Strengths")
-        for s in rep.get("strengths", []):
-            st.write(f"• {s}")
-
-        # Weaknesses
-        st.markdown("### ⚠️ Weaknesses")
-        for w in rep.get("weaknesses", []):
-            st.write(f"• {w}")
-
-        # Improvements
-        st.markdown("### 🛠️ Improvement Suggestions")
-        for i in rep.get("improvements", []):
-            st.write(f"• {i}")
-
-        # Missing Skills
+        # -----------------------------
+        # MISSING SKILLS
+        # -----------------------------
         st.markdown("### ❌ Missing Skills")
-        for m in rep.get("skill_gap", []):
-            st.write(f"• {m}")
+        st.write(report.get("skill_gap", "None"))
 
 else:
     st.info("Upload resumes + JD → Click Analyze")
